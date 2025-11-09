@@ -1,0 +1,1524 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Голосовой Математический Репетитор</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            color: #333;
+            padding: 15px;
+            position: relative;
+            overflow: hidden;
+            gap: 15px;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .sidebar {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 
+                0 20px 40px rgba(0,0,0,0.15),
+                0 0 0 1px rgba(255,255,255,0.5) inset;
+            padding: 20px 15px;
+            width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            animation: fadeInLeft 0.6s ease-out;
+            align-items: center;
+        }
+
+        @keyframes fadeInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .logo-container {
+            margin-bottom: 10px;
+        }
+
+        .logo {
+            width: 120px;
+            height: auto;
+            filter: drop-shadow(0 8px 20px rgba(0,0,0,0.2));
+        }
+
+        .sidebar-divider {
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+            margin: 5px 0;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 15px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 
+                0 20px 40px rgba(0,0,0,0.15),
+                0 0 0 1px rgba(255,255,255,0.5) inset;
+            padding: 25px 30px;
+            flex: 1;
+            text-align: center;
+            position: relative;
+            animation: fadeInUp 0.6s ease-out;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .history-card {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 
+                0 20px 40px rgba(0,0,0,0.15),
+                0 0 0 1px rgba(255,255,255,0.5) inset;
+            padding: 25px 20px;
+            width: 320px;
+            animation: fadeInUp 0.6s ease-out 0.2s both;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+            font-size: 1.6em;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            animation: slideDown 0.6s ease-out 0.2s both;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status {
+            font-size: 0.9em;
+            margin: 15px 0;
+            padding: 12px 20px;
+            border-radius: 15px;
+            font-weight: 600;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .status.listening {
+            background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);
+            color: #234e52;
+            border: 2px solid #38b2ac;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        .status.speaking {
+            background: linear-gradient(135deg, #fef5e7 0%, #feebc8 100%);
+            color: #744210;
+            border: 2px solid #f6ad55;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        .status.waiting {
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            color: #22543d;
+            border: 2px solid #68d391;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% {
+                box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            }
+            50% {
+                box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+            }
+        }
+
+        .question-display {
+            font-size: 2.5em;
+            margin: 15px 0;
+            color: #2d3748;
+            font-weight: 800;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 
+                0 10px 30px rgba(0,0,0,0.06),
+                0 0 0 1px rgba(0,0,0,0.03) inset;
+            transition: all 0.4s ease;
+            letter-spacing: 0.05em;
+        }
+
+        .question-display:not(:empty) {
+            animation: questionAppear 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes questionAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .progress {
+            margin: 15px 0;
+            background: #e2e8f0;
+            border-radius: 12px;
+            height: 10px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05) inset;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 30px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.3px;
+            width: 100%;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: linear-gradient(135deg, #cbd5e0, #a0aec0);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            opacity: 0.6;
+        }
+
+        button:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        #startBtn {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+        }
+
+        #startBtn:hover {
+            box-shadow: 0 8px 25px rgba(72, 187, 120, 0.4);
+        }
+
+        #stopBtn {
+            background: linear-gradient(135deg, #fc8181, #f56565);
+            box-shadow: 0 4px 15px rgba(245, 101, 101, 0.3);
+        }
+
+        #stopBtn:hover {
+            box-shadow: 0 8px 25px rgba(245, 101, 101, 0.4);
+        }
+
+        #repeatBtn {
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+            box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
+        }
+
+        #repeatBtn:hover {
+            box-shadow: 0 8px 25px rgba(66, 153, 225, 0.4);
+        }
+
+        #skipBtn {
+            background: linear-gradient(135deg, #ed8936, #dd6b20);
+            box-shadow: 0 4px 15px rgba(237, 137, 54, 0.3);
+        }
+
+        #skipBtn:hover {
+            box-shadow: 0 8px 25px rgba(237, 137, 54, 0.4);
+        }
+
+        #resetBtn {
+            background: linear-gradient(135deg, #718096, #4a5568);
+            box-shadow: 0 4px 15px rgba(113, 128, 150, 0.3);
+        }
+
+        #resetBtn:hover {
+            box-shadow: 0 8px 25px rgba(113, 128, 150, 0.4);
+        }
+
+        .history {
+            text-align: left;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history h3 {
+            margin-bottom: 15px;
+            color: #2d3748;
+            font-size: 1.1em;
+            font-weight: 800;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        #historyList {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        #historyList::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #historyList::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+
+        #historyList::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 10px;
+        }
+
+        #historyList:empty::before {
+            content: 'История ответов появится здесь';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #a0aec0;
+            font-style: italic;
+            font-size: 0.85em;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .history-item {
+            margin: 8px 0;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border-left: 3px solid #e2e8f0;
+            transition: all 0.3s ease;
+            animation: historyItemAppear 0.4s ease-out;
+            font-size: 0.85em;
+        }
+
+        @keyframes historyItemAppear {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .history-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .history-item.correct {
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            border-left-color: #48bb78;
+            border-left-width: 3px;
+        }
+
+        .history-item.incorrect {
+            background: linear-gradient(135deg, #fed7d7 0%, #feb2b2 100%);
+            border-left-color: #f56565;
+            border-left-width: 3px;
+        }
+
+        .history-item strong {
+            font-size: 0.95em;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .history-item div {
+            font-size: 0.8em;
+        }
+
+        .settings {
+            margin-top: 15px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 15px;
+            text-align: left;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05) inset;
+        }
+
+        .settings h3 {
+            margin-bottom: 12px;
+            color: #2d3748;
+            font-size: 0.95em;
+            font-weight: 700;
+        }
+
+        .setting-item {
+            margin: 12px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .setting-item label {
+            font-weight: 600;
+            color: #2d3748;
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+
+        .setting-item input[type="range"] {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: #e2e8f0;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .setting-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .setting-item input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+        }
+
+        .setting-item input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            border: none;
+        }
+
+        .setting-item select {
+            padding: 6px 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            background: white;
+            color: #2d3748;
+            font-size: 0.75em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .setting-item select:hover {
+            border-color: #667eea;
+        }
+
+        .setting-item select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .setting-item span {
+            min-width: 35px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.8em;
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #fed7d7 0%, #feb2b2 100%);
+            color: #c53030;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin: 10px 0;
+            border: 2px solid #f56565;
+            font-size: 0.85em;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(245, 101, 101, 0.2);
+            animation: messageSlideIn 0.4s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .error-message::before {
+            content: '⚠️';
+            font-size: 1.2em;
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+            color: #22543d;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin: 10px 0;
+            border: 2px solid #48bb78;
+            font-size: 0.9em;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.2);
+            animation: messageSlideIn 0.4s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .success-message::before {
+            content: '✓';
+            font-size: 1.4em;
+            color: #48bb78;
+        }
+
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .voice-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .voice-indicator::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .voice-indicator.listening {
+            background: #38b2ac;
+        }
+
+        .voice-indicator.listening::before {
+            background: #38b2ac;
+        }
+
+        .voice-indicator.speaking {
+            background: #f6ad55;
+        }
+
+        .voice-indicator.speaking::before {
+            background: #f6ad55;
+        }
+
+        .voice-indicator.waiting {
+            background: #68d391;
+        }
+
+        @keyframes pulse {
+            0% { 
+                transform: translate(-50%, -50%) scale(1); 
+                opacity: 0.8; 
+            }
+            50% { 
+                transform: translate(-50%, -50%) scale(2); 
+                opacity: 0; 
+            }
+            100% { 
+                transform: translate(-50%, -50%) scale(1); 
+                opacity: 0; 
+            }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .history-card {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+
+            .sidebar {
+                width: 100%;
+                flex-direction: row;
+                padding: 15px;
+                gap: 15px;
+            }
+
+            .logo {
+                width: 80px;
+            }
+
+            .sidebar-divider {
+                width: 2px;
+                height: 60px;
+                background: linear-gradient(180deg, transparent, #e2e8f0, transparent);
+            }
+
+            .controls {
+                flex-direction: row;
+                flex-wrap: wrap;
+                flex: 1;
+                justify-content: center;
+            }
+
+            button {
+                flex: 1;
+                min-width: 120px;
+            }
+
+            .main-content {
+                flex-direction: column;
+                overflow-y: visible;
+            }
+
+            .history-card {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .logo {
+                width: 60px;
+            }
+
+            button {
+                padding: 8px 12px;
+                font-size: 0.75em;
+                min-width: 100px;
+            }
+
+            h1 {
+                font-size: 1.3em;
+            }
+
+            .question-display {
+                font-size: 2em;
+                min-height: 60px;
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .controls {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+                min-width: unset;
+            }
+
+            .question-display {
+                font-size: 1.5em;
+                min-height: 50px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo-container">
+            <img src="logo.svg" alt="B.Z.I.EDUCATION" class="logo">
+        </div>
+        
+        <div class="sidebar-divider"></div>
+
+        <div class="controls">
+            <button id="startBtn" onclick="startSession()">Начать</button>
+            <button id="stopBtn" onclick="stopSession()" disabled>Остановить</button>
+            <button id="repeatBtn" onclick="repeatQuestion()" disabled>Повторить</button>
+            <button id="skipBtn" onclick="skipQuestion()" disabled>Пропустить</button>
+            <button id="resetBtn" onclick="resetSession()">Сброс</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+            <h1>🎯 Голосовой Математический Репетитор</h1>
+            
+            <div id="status" class="status waiting">
+                <span class="voice-indicator"></span>
+                Готов к началу урока
+            </div>
+
+            <div id="questionDisplay" class="question-display">
+                Нажмите "Начать" для начала урока
+            </div>
+
+            <div class="progress">
+                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+            </div>
+
+            <div id="errorMessage" class="error-message hidden"></div>
+            <div id="successMessage" class="success-message hidden"></div>
+
+            <div class="settings">
+                <h3>Настройки голоса</h3>
+                <div class="setting-item">
+                    <label>Скорость речи:</label>
+                    <input type="range" id="speechRate" min="0.5" max="1.5" step="0.1" value="0.8">
+                    <span id="rateValue">0.8</span>
+                </div>
+                <div class="setting-item">
+                    <label>Высота голоса:</label>
+                    <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1.0">
+                    <span id="pitchValue">1.0</span>
+                </div>
+                <div class="setting-item">
+                    <label>Голос:</label>
+                    <select id="voiceSelect">
+                        <option value="auto">Автоматический</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="history-card">
+            <div class="history">
+                <h3>История ответов</h3>
+                <div id="historyList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Russian number mapping
+        const russianNumbers = {
+            'один': 1, 'одна': 1, 'одно': 1,
+            'два': 2, 'две': 2,
+            'три': 3,
+            'четыре': 4,
+            'пять': 5,
+            'шесть': 6,
+            'семь': 7,
+            'восемь': 8,
+            'девять': 9,
+            'десять': 10,
+            'одиннадцать': 11,
+            'двенадцать': 12,
+            'тринадцать': 13,
+            'четырнадцать': 14,
+            'пятнадцать': 15,
+            'шестнадцать': 16,
+            'семнадцать': 17,
+            'восемнадцать': 18,
+            'девятнадцать': 19,
+            'двадцать': 20
+        };
+
+        // Question sets
+        const questions = {
+            label1: [
+                { question: "2 + 1", answer: 3, text: "два плюс один" },
+                { question: "5 + 1", answer: 6, text: "пять плюс один" },
+                { question: "7 + 1", answer: 8, text: "семь плюс один" },
+                { question: "3 + 1", answer: 4, text: "три плюс один" },
+                { question: "9 + 1", answer: 10, text: "девять плюс один" }
+            ],
+            label2: [
+                { question: "2 + 2", answer: 4, text: "два плюс два" },
+                { question: "5 + 2", answer: 7, text: "пять плюс два" },
+                { question: "7 + 2", answer: 9, text: "семь плюс два" },
+                { question: "4 + 2", answer: 6, text: "четыре плюс два" },
+                { question: "9 + 2", answer: 11, text: "девять плюс два" }
+            ]
+        };
+
+        // Application state
+        let sessionState = {
+            currentLabel: 1,
+            currentQuestionIndex: 0,
+            errors: [],
+            isActive: false,
+            isListening: false,
+            isSpeaking: false,
+            currentQuestion: null,
+            sessionHistory: [],
+            processingAnswer: false
+        };
+
+        // Voice services
+        let speechSynthesis = window.speechSynthesis;
+        let speechRecognition = null;
+        let currentVoice = null;
+
+        // Initialize voice services
+        function initializeVoiceServices() {
+            // Initialize speech recognition
+            if ('webkitSpeechRecognition' in window) {
+                speechRecognition = new webkitSpeechRecognition();
+            } else if ('SpeechRecognition' in window) {
+                speechRecognition = new SpeechRecognition();
+            } else {
+                showError('Ваш браузер не поддерживает распознавание речи. Пожалуйста, используйте Chrome или Edge.');
+                return false;
+            }
+
+            speechRecognition.lang = 'ru-RU';
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = true;
+            speechRecognition.maxAlternatives = 1;
+
+            speechRecognition.onstart = () => {
+                console.log('✅ Speech recognition STARTED');
+                sessionState.isListening = true;
+                updateStatus('Слушаю ваш ответ...', 'listening');
+            };
+
+            speechRecognition.onresult = (event) => {
+                console.log('✅ Speech recognition RESULT:', event.results);
+                if (sessionState.processingAnswer) {
+                    console.log('Ignoring result while processing answer');
+                    return;
+                }
+                if (!sessionState.isActive) {
+                    console.log('Session not active, ignoring result');
+                    return;
+                }
+                // Get the final result (not interim)
+                for (let i = event.results.length - 1; i >= 0; i--) {
+                    const res = event.results[i];
+                    if (res.isFinal) {
+                        const result = res[0].transcript.toLowerCase().trim();
+                        console.log('✅ Final transcript:', result);
+                        if (!sessionState.currentQuestion) {
+                            console.log('No current question set, ignoring late result');
+                            return;
+                        }
+                        // Stop recognition before processing to avoid duplicate results
+                        sessionState.isListening = false;
+                        try { 
+                            if (speechRecognition) {
+                                speechRecognition.stop(); 
+                            }
+                        } catch (error) {
+                            console.error('Error stopping recognition:', error);
+                        }
+                        processAnswer(result);
+                        break;
+                    }
+                }
+            };
+
+            speechRecognition.onerror = (event) => {
+                console.error('❌ Speech recognition ERROR:', event.error);
+                sessionState.isListening = false;
+                
+                // Specific error handling with user-friendly messages
+                const errorMessages = {
+                    'no-speech': 'Не услышал ответ. Попробуйте еще раз.',
+                    'network': 'Проблема с интернетом. Проверьте подключение.',
+                    'not-allowed': 'Нет доступа к микрофону. Разрешите доступ в настройках браузера.',
+                    'audio-capture': 'Микрофон не найден. Проверьте подключение микрофона.',
+                    'service-not-allowed': 'Служба распознавания речи недоступна. Попробуйте позже.',
+                    'aborted': 'Распознавание прервано.',
+                    'bad-grammar': 'Ошибка в грамматике.'
+                };
+                
+                const errorMessage = errorMessages[event.error] || `Ошибка распознавания: ${event.error}`;
+                showError(errorMessage);
+                
+                // Don't automatically retry - let the user click skip or stop if needed
+                // Automatic retries were causing endless loops
+                
+                updateStatus('Ошибка распознавания', 'waiting');
+            };
+
+            speechRecognition.onend = () => {
+                console.log('✅ Speech recognition ENDED');
+                sessionState.isListening = false;
+                // Don't automatically restart - let askCurrentQuestion control when to listen
+            };
+
+            // Load available voices
+            loadVoices();
+            speechSynthesis.onvoiceschanged = loadVoices;
+
+            return true;
+        }
+
+        // Load available voices
+        function loadVoices() {
+            const voices = speechSynthesis.getVoices();
+            const voiceSelect = document.getElementById('voiceSelect');
+            
+            // Clear existing options except the first one
+            voiceSelect.innerHTML = '<option value="auto">Автоматический</option>';
+            
+            voices.forEach((voice, index) => {
+                if (voice.lang.startsWith('ru')) {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    voiceSelect.appendChild(option);
+                }
+            });
+        }
+
+        // Parse Russian number from speech
+        function parseRussianNumber(speech) {
+            if (!speech || typeof speech !== 'string') {
+                return null;
+            }
+            
+            const trimmed = speech.trim();
+            
+            // If transcript contains digits (e.g., "10"), parse directly
+            const digitMatch = trimmed.match(/\d+/);
+            if (digitMatch) {
+                const n = parseInt(digitMatch[0], 10);
+                if (!isNaN(n) && n >= 0 && n <= 100) {
+                    return n;
+                }
+            }
+            
+            // Try match known russian words
+            const words = trimmed.split(/\s+/);
+            for (let word of words) {
+                if (russianNumbers[word]) {
+                    return russianNumbers[word];
+                }
+            }
+            
+            return null;
+        }
+
+        // Speak text in Russian
+        function speak(text) {
+            return new Promise((resolve) => {
+                if (!speechSynthesis) {
+                    resolve();
+                    return;
+                }
+
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ru-RU';
+                utterance.rate = parseFloat(document.getElementById('speechRate').value);
+                utterance.pitch = parseFloat(document.getElementById('speechPitch').value);
+                
+            const voiceIndex = document.getElementById('voiceSelect').value;
+            const voices = speechSynthesis.getVoices();
+            if (voiceIndex !== 'auto' && voices[voiceIndex]) {
+                utterance.voice = voices[voiceIndex];
+            }
+
+                utterance.onstart = () => {
+                    sessionState.isSpeaking = true;
+                    updateStatus('Говорю вопрос...', 'speaking');
+                };
+
+                utterance.onend = () => {
+                    sessionState.isSpeaking = false;
+                    updateStatus('Готов к ответу', 'waiting');
+                    resolve();
+                };
+
+                utterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event.error);
+                    sessionState.isSpeaking = false;
+                    updateStatus('Ошибка синтеза речи', 'waiting');
+                    resolve();
+                };
+
+                speechSynthesis.speak(utterance);
+            });
+        }
+
+        // Update status display
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = `<span class="voice-indicator ${type}"></span>${message}`;
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+            setTimeout(() => {
+                errorEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successEl = document.getElementById('successMessage');
+            successEl.textContent = message;
+            successEl.classList.remove('hidden');
+            setTimeout(() => {
+                successEl.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const totalQuestions = questions[`label${sessionState.currentLabel}`].length;
+            const progress = ((sessionState.currentQuestionIndex) / totalQuestions) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+        }
+
+        // Add item to history
+        function addToHistory(question, userAnswer, correctAnswer, isCorrect) {
+            const historyList = document.getElementById('historyList');
+            const item = document.createElement('div');
+            item.className = `history-item ${isCorrect ? 'correct' : 'incorrect'}`;
+            
+            // Create elements safely to prevent XSS
+            const strong = document.createElement('strong');
+            strong.textContent = question;
+            
+            const questionDiv = document.createElement('div');
+            questionDiv.appendChild(strong);
+            
+            const detailsDiv = document.createElement('div');
+            detailsDiv.textContent = `Ваш ответ: ${userAnswer} | Правильный: ${correctAnswer} ${isCorrect ? '✓' : '✗'}`;
+            
+            item.appendChild(questionDiv);
+            item.appendChild(detailsDiv);
+            
+            historyList.insertBefore(item, historyList.firstChild);
+            sessionState.sessionHistory.push({
+                question, userAnswer, correctAnswer, isCorrect,
+                timestamp: new Date().toLocaleTimeString()
+            });
+        }
+
+        // Process user answer
+        function processAnswer(speech) {
+            // Prevent multiple rapid calls
+            if (sessionState.processingAnswer) {
+                console.log('Already processing answer, ignoring duplicate');
+                return;
+            }
+            sessionState.processingAnswer = true;
+            // Pause recognition while processing
+            try { 
+                if (sessionState.isListening && speechRecognition) {
+                    speechRecognition.stop(); 
+                }
+            } catch (error) {
+                console.error('Error stopping speech recognition:', error);
+            }
+            
+            const userAnswer = parseRussianNumber(speech);
+            const currentQuestion = sessionState.currentQuestion;
+            
+            console.log('Processing answer:', userAnswer, 'for question:', currentQuestion.question);
+            
+            if (userAnswer === null) {
+                showError('Не удалось распознать число. Нажмите "Пропустить" или произнесите ответ четко.');
+                sessionState.processingAnswer = false;
+                updateStatus('Готов к ответу', 'waiting');
+                // Don't automatically retry - let user click skip or try again manually
+                // This was causing endless loops when speech wasn't recognized
+                return;
+            }
+
+            const isCorrect = userAnswer === currentQuestion.answer;
+            
+            addToHistory(currentQuestion.question, userAnswer, currentQuestion.answer, isCorrect);
+            
+            if (!isCorrect) {
+                sessionState.errors.push(currentQuestion);
+                showError(`Неправильно! Правильный ответ: ${currentQuestion.answer}`);
+            } else {
+                showSuccess('Правильно!');
+            }
+
+            // Move to next question
+            sessionState.currentQuestionIndex++;
+            updateProgress();
+            
+            setTimeout(() => {
+                sessionState.processingAnswer = false;
+                if (sessionState.isActive) {
+                    if (sessionState.currentQuestionIndex < questions[`label${sessionState.currentLabel}`].length) {
+                        askCurrentQuestion();
+                    } else {
+                        completeCurrentLabel();
+                    }
+                }
+            }, 2000);
+        }
+
+        // Ask current question
+        async function askCurrentQuestion() {
+            console.log('Asking question:', sessionState.currentQuestionIndex, 'of', questions[`label${sessionState.currentLabel}`].length);
+            
+            const currentQuestions = questions[`label${sessionState.currentLabel}`];
+            if (sessionState.currentQuestionIndex >= currentQuestions.length) {
+                console.log('Index at end of questions, completing label');
+                await completeCurrentLabel();
+                return;
+            }
+            sessionState.currentQuestion = currentQuestions[sessionState.currentQuestionIndex];
+            sessionState.processingAnswer = false;
+            
+            document.getElementById('questionDisplay').textContent = sessionState.currentQuestion.question;
+            
+            await speak(sessionState.currentQuestion.text);
+            
+            // Start listening for answer (only if not already listening)
+            setTimeout(() => {
+                if (sessionState.isActive && !sessionState.isListening) {
+                    console.log('Starting speech recognition...');
+                    try {
+                        speechRecognition.start();
+                    } catch (error) {
+                        console.error('Error starting speech recognition:', error);
+                        showError('Ошибка запуска распознавания речи. Попробуйте еще раз.');
+                        setTimeout(() => {
+                            if (sessionState.isActive) {
+                                askCurrentQuestion();
+                            }
+                        }, 2000);
+                    }
+                } else if (sessionState.isListening) {
+                    console.log('Speech recognition already running, skipping start');
+                }
+            }, 1000);
+        }
+
+        // Complete current label
+        async function completeCurrentLabel() {
+            const totalQuestions = questions[`label${sessionState.currentLabel}`].length;
+            const errorCount = sessionState.errors.length;
+            
+            // Announce statistics
+            let message = `Всего было ${totalQuestions} вопросов, неправильных ответов: ${errorCount}.`;
+            await speak(message);
+            
+            // If there were errors, repeat the label according to README requirements
+            if (errorCount > 0) {
+                await speak('Давайте повторим эти примеры.');
+                // Announce incorrect answers
+                for (const error of sessionState.errors) {
+                    await speak(`${error.text}. Правильный ответ: ${error.answer}`);
+                }
+                
+                // Clear errors and restart current label
+                sessionState.errors = [];
+                sessionState.currentQuestionIndex = 0;
+                updateProgress();
+                setTimeout(() => {
+                    if (sessionState.isActive) {
+                        askCurrentQuestion();
+                    }
+                }, 2000);
+            } else {
+                // No errors - proceed to next label or finish
+                sessionState.errors = [];
+                
+                if (sessionState.currentLabel === 1) {
+                    await speak('Переходим к следующему уровню.');
+                    sessionState.currentLabel = 2;
+                    sessionState.currentQuestionIndex = 0;
+                    updateProgress();
+                    setTimeout(() => {
+                        if (sessionState.isActive) {
+                            askCurrentQuestion();
+                        }
+                    }, 2000);
+                } else {
+                    await speak('Ты хорошо поработал!');
+                    showSuccess('Ты хорошо поработал!');
+                    sessionState.isActive = false;
+                    updateStatus('Урок завершен!', 'waiting');
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('skipBtn').disabled = true;
+                    saveSession();
+                }
+            }
+        }
+
+        // Start session
+        async function startSession() {
+            if (!initializeVoiceServices()) {
+                return;
+            }
+
+            // Load saved session if exists
+            loadSession();
+            
+            sessionState.isActive = true;
+            sessionState.currentLabel = 1;
+            sessionState.currentQuestionIndex = 0;
+            sessionState.errors = [];
+            sessionState.sessionHistory = [];
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('repeatBtn').disabled = false;
+            document.getElementById('skipBtn').disabled = false;
+            document.getElementById('historyList').innerHTML = '';
+            
+            updateStatus('Начинаем урок...', 'waiting');
+            updateProgress();
+            
+            await speak('Привет! Давайте решать примеры.');
+            await askCurrentQuestion();
+        }
+
+        // Repeat current question
+        function repeatQuestion() {
+            if (!sessionState.isActive || !sessionState.currentQuestion) return;
+            
+            console.log('Repeating question');
+            
+            // Stop any ongoing speech recognition
+            if (speechRecognition && sessionState.isListening) {
+                try {
+                    speechRecognition.stop();
+                } catch (error) {
+                    console.error('Error stopping recognition:', error);
+                }
+            }
+            
+            sessionState.processingAnswer = false;
+            
+            // Ask the same question again
+            askCurrentQuestion();
+        }
+
+        // Skip current question
+        function skipQuestion() {
+            if (!sessionState.isActive || !sessionState.currentQuestion) return;
+            
+            console.log('Skipping question');
+            
+            // Stop any ongoing speech recognition
+            if (speechRecognition && sessionState.isListening) {
+                try {
+                    speechRecognition.stop();
+                } catch (error) {
+                    console.error('Error stopping recognition:', error);
+                }
+            }
+            
+            sessionState.processingAnswer = false;
+            
+            // Mark as incorrect and add to errors
+            const currentQuestion = sessionState.currentQuestion;
+            addToHistory(currentQuestion.question, 'пропущено', currentQuestion.answer, false);
+            sessionState.errors.push(currentQuestion);
+            
+            showError(`Пропущено. Правильный ответ: ${currentQuestion.answer}`);
+            
+            // Move to next question
+            sessionState.currentQuestionIndex++;
+            updateProgress();
+            
+            setTimeout(() => {
+                if (sessionState.isActive) {
+                    if (sessionState.currentQuestionIndex < questions[`label${sessionState.currentLabel}`].length) {
+                        askCurrentQuestion();
+                    } else {
+                        completeCurrentLabel();
+                    }
+                }
+            }, 2000);
+        }
+
+        // Stop session
+        function stopSession() {
+            sessionState.isActive = false;
+            sessionState.isListening = false;
+            sessionState.isSpeaking = false;
+            
+            if (speechRecognition) {
+                speechRecognition.stop();
+            }
+            if (speechSynthesis) {
+                speechSynthesis.cancel();
+            }
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('repeatBtn').disabled = true;
+            document.getElementById('skipBtn').disabled = true;
+            
+            updateStatus('Урок остановлен', 'waiting');
+            saveSession();
+        }
+
+        // Reset session
+        function resetSession() {
+            stopSession();
+            sessionState = {
+                currentLabel: 1,
+                currentQuestionIndex: 0,
+                errors: [],
+                isActive: false,
+                isListening: false,
+                isSpeaking: false,
+                currentQuestion: null,
+                sessionHistory: [],
+                processingAnswer: false
+            };
+            
+            document.getElementById('questionDisplay').textContent = 'Нажмите "Начать" для начала урока';
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('historyList').innerHTML = '';
+            
+            updateStatus('Готов к началу урока', 'waiting');
+            
+            // Clear saved session
+            localStorage.removeItem('voiceMathTutorSession');
+        }
+
+        // Save session to localStorage
+        function saveSession() {
+            const sessionData = {
+                currentLabel: sessionState.currentLabel,
+                currentQuestionIndex: sessionState.currentQuestionIndex,
+                errors: sessionState.errors,
+                sessionHistory: sessionState.sessionHistory,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem('voiceMathTutorSession', JSON.stringify(sessionData));
+        }
+
+        // Load session from localStorage
+        function loadSession() {
+            const savedSession = localStorage.getItem('voiceMathTutorSession');
+            if (savedSession) {
+                try {
+                    const sessionData = JSON.parse(savedSession);
+                    const savedDate = new Date(sessionData.timestamp);
+                    const now = new Date();
+                    
+                    // Only load if saved within last 24 hours
+                    if (now - savedDate < 24 * 60 * 60 * 1000) {
+                        sessionState.currentLabel = sessionData.currentLabel || 1;
+                        sessionState.currentQuestionIndex = sessionData.currentQuestionIndex || 0;
+                        sessionState.errors = sessionData.errors || [];
+                        sessionState.sessionHistory = sessionData.sessionHistory || [];
+                        
+                        // Restore history display
+                        const historyList = document.getElementById('historyList');
+                        historyList.innerHTML = '';
+                        sessionState.sessionHistory.forEach(item => {
+                            const historyItem = document.createElement('div');
+                            historyItem.className = `history-item ${item.isCorrect ? 'correct' : 'incorrect'}`;
+                            const status = item.isCorrect ? '✓' : '✗';
+                            historyItem.innerHTML = `
+                                <strong>${item.question}</strong><br>
+                                Ваш ответ: ${item.userAnswer} | Правильный: ${item.correctAnswer} ${status}
+                            `;
+                            historyList.appendChild(historyItem);
+                        });
+                        
+                        updateProgress();
+                        showSuccess('Сессия восстановлена. Продолжаем с того места, где остановились.');
+                    }
+                } catch (error) {
+                    console.error('Error loading session:', error);
+                }
+            }
+        }
+
+        // Settings event listeners
+        document.getElementById('speechRate').addEventListener('input', function() {
+            document.getElementById('rateValue').textContent = this.value;
+        });
+
+        document.getElementById('speechPitch').addEventListener('input', function() {
+            document.getElementById('pitchValue').textContent = this.value;
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('Готов к началу урока', 'waiting');
+            
+            // Check for microphone permission
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(() => {
+                        console.log('Microphone access granted');
+                    })
+                    .catch(() => {
+                        showError('Необходимо разрешить доступ к микрофону для работы приложения.');
+                    });
+            }
+        });
+    </script>
+</body>
+</html>
