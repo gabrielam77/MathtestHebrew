@@ -192,6 +192,83 @@
             border: 2px solid #68d391;
         }
 
+        .compatibility-notice {
+            margin: 10px 0 0;
+            padding: 12px 18px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+            color: #742a2a;
+            border: 2px solid #f56565;
+            font-size: 0.85em;
+            line-height: 1.5;
+            text-align: right;
+            box-shadow: 0 10px 30px rgba(245, 101, 101, 0.15);
+        }
+
+        .manual-answer {
+            margin: 20px 0 10px;
+            padding: 18px 20px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .manual-answer label {
+            font-weight: 700;
+            color: #2d3748;
+            font-size: 0.9em;
+            text-align: right;
+        }
+
+        .manual-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .manual-input-row input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 12px;
+            border: 2px solid #cbd5f5;
+            font-size: 1em;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            text-align: right;
+        }
+
+        .manual-input-row input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .manual-input-row input:disabled {
+            background: #f1f5f9;
+            cursor: not-allowed;
+            border-color: #e2e8f0;
+        }
+
+        .manual-input-row button {
+            width: auto;
+            min-width: 140px;
+            padding: 12px 20px;
+        }
+
+        .manual-input-row button:disabled {
+            cursor: not-allowed;
+        }
+
+        .manual-hint {
+            font-size: 0.8em;
+            color: #4a5568;
+            text-align: right;
+            line-height: 1.5;
+        }
+
         @keyframes statusPulse {
             0%, 100% {
                 box-shadow: 0 4px 15px rgba(0,0,0,0.08);
@@ -742,6 +819,15 @@
                 top: auto;
                 max-height: none;
             }
+
+            .manual-input-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .manual-input-row button {
+                width: 100%;
+            }
         }
 
         @media (max-width: 768px) {
@@ -815,12 +901,25 @@
                 מוכן להתחלת השיעור
             </div>
 
+            <div id="compatibilityNotice" class="compatibility-notice hidden"></div>
+
             <div id="questionDisplay" class="question-display">
                 לחצו על "התחל" כדי להתחיל בשיעור
             </div>
 
             <div class="progress">
                 <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+            </div>
+
+            <div id="manualAnswerSection" class="manual-answer">
+                <label for="manualAnswerInput">אפשר לענות גם בהקלדה:</label>
+                <div class="manual-input-row">
+                    <input type="text" id="manualAnswerInput" placeholder="הקלידו את התשובה המספרית" disabled>
+                    <button id="manualAnswerBtn" onclick="submitManualAnswer()" disabled>שליחת תשובה</button>
+                </div>
+                <p id="manualHint" class="manual-hint">
+                    אם הזיהוי הקולי לא עובד, כתבו את התשובה ולחצו על "שליחת תשובה".
+                </p>
             </div>
 
             <div id="errorMessage" class="error-message hidden"></div>
@@ -844,7 +943,7 @@
                         <option value="auto">אוטומטי</option>
                     </select>
                 </div>
-            </div>
+            </div> 
         </div>
 
         <div class="history-card">
@@ -902,6 +1001,19 @@
 
         const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
         const SpeechGrammarListConstructor = window.SpeechGrammarList || window.webkitSpeechGrammarList || null;
+        const speechSynthesisSupported = 'speechSynthesis' in window && !!window.speechSynthesis;
+        const userAgent = (navigator.userAgent || '').toLowerCase();
+        const isAndroid = /android/.test(userAgent);
+        const isIOS = /iphone|ipad|ipod/.test(userAgent);
+        const isSafari = /safari/.test(userAgent) && !/chrome|chromium|android|edge|opr/.test(userAgent);
+        const isOpera = /opr|opera/.test(userAgent);
+        let androidPrimeResolver = null;
+        const compatibilityNoticeEl = document.getElementById('compatibilityNotice');
+        const manualAnswerSection = document.getElementById('manualAnswerSection');
+        const manualAnswerInput = document.getElementById('manualAnswerInput');
+        const manualAnswerBtn = document.getElementById('manualAnswerBtn');
+        const manualHint = document.getElementById('manualHint');
+        const compatibilityNotes = new Set();
 
         function createNumberGrammar() {
             if (!SpeechGrammarListConstructor) {
@@ -914,6 +1026,55 @@
                 uniqueTerms.add(i.toString());
             }
             return `#JSGF V1.0; grammar numbers; public <number> = ${Array.from(uniqueTerms).join(' | ')};`;
+        }
+
+        async function primeAndroidRecognition() {
+            if (!isAndroid || sessionState.androidPrimed || !speechRecognition) {
+                return;
+            }
+
+            if (sessionState.isPrimingRecognition) {
+                return;
+            }
+
+            console.log('🔄 Priming speech recognition for Android');
+            sessionState.isPrimingRecognition = true;
+            sessionState.skipRecognitionResults = true;
+            sessionState.waitingForAnswer = false;
+
+            await new Promise((resolve) => {
+                androidPrimeResolver = () => {
+                    if (androidPrimeResolver) {
+                        androidPrimeResolver = null;
+                    }
+                    resolve();
+                };
+
+                try {
+                    speechRecognition.start();
+                    setTimeout(() => {
+                        try {
+                            speechRecognition.stop();
+                        } catch (stopError) {
+                            console.warn('Error stopping priming recognition:', stopError);
+                            if (androidPrimeResolver) {
+                                androidPrimeResolver();
+                            }
+                        }
+                    }, 600);
+                } catch (startError) {
+                    console.warn('Error starting priming recognition:', startError);
+                    if (androidPrimeResolver) {
+                        androidPrimeResolver();
+                    }
+                }
+            });
+
+            sessionState.isPrimingRecognition = false;
+            sessionState.skipRecognitionResults = false;
+            sessionState.androidPrimed = true;
+            sessionState.waitingForAnswer = false;
+            console.log('✅ Android speech recognition primed');
         }
 
         function getHebrewNumberValue(phrase) {
@@ -1016,6 +1177,83 @@
             return microphoneAccessPromise;
         }
 
+        function renderCompatibilityNotes() {
+            if (!compatibilityNoticeEl) {
+                return;
+            }
+            if (compatibilityNotes.size === 0) {
+                compatibilityNoticeEl.classList.add('hidden');
+                compatibilityNoticeEl.textContent = '';
+            } else {
+                compatibilityNoticeEl.classList.remove('hidden');
+                compatibilityNoticeEl.innerHTML = Array.from(compatibilityNotes)
+                    .map(note => `<span>${note}</span>`)
+                    .join('<br>');
+            }
+        }
+
+        function addCompatibilityNote(note) {
+            if (!note) return;
+            compatibilityNotes.add(note);
+            renderCompatibilityNotes();
+        }
+
+        function removeCompatibilityNote(note) {
+            if (!note) return;
+            compatibilityNotes.delete(note);
+            renderCompatibilityNotes();
+        }
+
+        function setManualAnswerEnabled(enabled) {
+            if (!manualAnswerInput || !manualAnswerBtn) return;
+            const allow = !!enabled && sessionState.isActive && !sessionState.processingAnswer;
+            manualAnswerInput.disabled = !allow;
+            manualAnswerBtn.disabled = !allow;
+        }
+
+        function disableSpeechRecognition(reason) {
+            sessionState.voiceInputSupported = false;
+            sessionState.isListening = false;
+            sessionState.waitingForAnswer = false;
+            sessionState.microphoneReady = false;
+            sessionState.isPrimingRecognition = false;
+            sessionState.skipRecognitionResults = false;
+            sessionState.androidPrimed = false;
+            if (speechRecognition) {
+                try {
+                    speechRecognition.stop();
+                } catch (error) {
+                    console.warn('Error stopping speech recognition during disable:', error);
+                }
+            }
+            speechRecognition = null;
+            if (reason) {
+                addCompatibilityNote(reason);
+            }
+            if (manualHint) {
+                manualHint.textContent = 'הקלידו את התשובה ולחצו "שליחת תשובה" להמשך התרגול.';
+            }
+            if (sessionState.isActive) {
+                setManualAnswerEnabled(true);
+                updateStatus('הקלידו את התשובה ולחצו "שליחת תשובה"', 'waiting');
+            }
+        }
+
+        function submitManualAnswer() {
+            if (!sessionState.isActive || !sessionState.currentQuestion) {
+                showError('אין שאלה פעילה כרגע.');
+                return;
+            }
+            const value = manualAnswerInput.value.trim();
+            if (!value) {
+                showError('אנא הקלידו תשובה ולאחר מכן לחצו על "שליחת תשובה".');
+                return;
+            }
+            processAnswer(value, []);
+            manualAnswerInput.value = '';
+            setManualAnswerEnabled(false);
+        }
+
         // Question sets
         const questions = {
             label1: [
@@ -1046,21 +1284,26 @@
             sessionHistory: [],
             processingAnswer: false,
             waitingForAnswer: false,
-            microphoneReady: false
+            microphoneReady: false,
+            isPrimingRecognition: false,
+            skipRecognitionResults: false,
+            androidPrimed: false,
+            voiceInputSupported: !!SpeechRecognitionConstructor,
+            voiceOutputSupported: speechSynthesisSupported
         };
 
         // Voice services
-        let speechSynthesis = window.speechSynthesis;
+        let speechSynthesis = speechSynthesisSupported ? window.speechSynthesis : null;
         let speechRecognition = null;
         let currentVoice = null;
 
         function startListeningForAnswer(delay = 0) {
-            if (!speechRecognition || !sessionState.isActive) {
+            if (!sessionState.voiceInputSupported || !speechRecognition || !sessionState.isActive) {
                 return;
             }
 
             const start = async () => {
-                if (!sessionState.isActive || sessionState.processingAnswer || sessionState.isListening || sessionState.isSpeaking) {
+                if (!sessionState.isActive || sessionState.processingAnswer || sessionState.isListening || sessionState.isSpeaking || sessionState.isPrimingRecognition) {
                     return;
                 }
 
@@ -1073,12 +1316,17 @@
                     sessionState.microphoneReady = true;
                 }
 
+                if (isAndroid && !sessionState.androidPrimed) {
+                    await primeAndroidRecognition();
+                }
+
                 try {
                     speechRecognition.start();
                     sessionState.waitingForAnswer = true;
                 } catch (error) {
                     if (error.name !== 'InvalidStateError') {
                         console.error('Error starting speech recognition:', error);
+                        disableSpeechRecognition('לא ניתן להפעיל זיהוי דיבור בדפדפן זה. ניתן להקליד תשובות במקום.');
                     }
                 }
             };
@@ -1095,9 +1343,13 @@
         // Initialize voice services
         function initializeVoiceServices() {
             // Initialize speech recognition
-            if (!SpeechRecognitionConstructor) {
-                showError('הדפדפן שלך לא תומך בזיהוי דיבור. השתמשו ב-Chrome או Edge.');
-                return false;
+            sessionState.voiceInputSupported = !!SpeechRecognitionConstructor;
+            sessionState.voiceOutputSupported = speechSynthesisSupported;
+
+            if (!sessionState.voiceInputSupported) {
+                addCompatibilityNote('הדפדפן לא תומך בזיהוי דיבור. ניתן להשיב דרך ההקלדה או להשתמש ב-Chrome/Edge.');
+                speechRecognition = null;
+                return true;
             }
 
             speechRecognition = new SpeechRecognitionConstructor();
@@ -1123,6 +1375,10 @@
             speechRecognition.onstart = () => {
                 console.log('✅ Speech recognition STARTED');
                 sessionState.isListening = true;
+                if (sessionState.isPrimingRecognition) {
+                    console.log('⚙️ Speech recognition priming in progress');
+                    return;
+                }
                 sessionState.waitingForAnswer = true;
                 updateStatus('מאזין לתשובה שלך...', 'listening');
             };
@@ -1135,6 +1391,10 @@
                 }
                 if (!sessionState.isActive) {
                     console.log('Session not active, ignoring result');
+                    return;
+                }
+                if (sessionState.isPrimingRecognition || sessionState.skipRecognitionResults) {
+                    console.log('Skipping recognition result (priming/warmup).');
                     return;
                 }
                 // Get the final result (not interim)
@@ -1178,6 +1438,19 @@
             speechRecognition.onerror = (event) => {
                 console.error('❌ Speech recognition ERROR:', event.error);
                 sessionState.isListening = false;
+                if (sessionState.isPrimingRecognition) {
+                    console.warn('Speech recognition error during priming:', event.error);
+                    sessionState.isPrimingRecognition = false;
+                    sessionState.skipRecognitionResults = false;
+                    sessionState.waitingForAnswer = false;
+                    sessionState.androidPrimed = false;
+                    if (androidPrimeResolver) {
+                        const resolver = androidPrimeResolver;
+                        androidPrimeResolver = null;
+                        resolver();
+                    }
+                    return;
+                }
                 sessionState.waitingForAnswer = false;
                 
                 // Specific error handling with user-friendly messages
@@ -1201,26 +1474,57 @@
                 const recoverableErrors = ['no-speech', 'aborted'];
                 if (sessionState.isActive && recoverableErrors.includes(event.error)) {
                     startListeningForAnswer(800);
+                } else if (['service-not-allowed', 'not-allowed', 'audio-capture'].includes(event.error)) {
+                    disableSpeechRecognition('הגישה לזיהוי דיבור נחסמה. השתמשו בהקלדת תשובה או הפעילו דפדפן תומך.');
+                } else if (event.error === 'network') {
+                    addCompatibilityNote('שירות זיהוי הדיבור אינו זמין כרגע (שגיאת רשת). ניתן להמשיך בהקלדה.');
+                    setManualAnswerEnabled(true);
                 }
             };
 
             speechRecognition.onend = () => {
                 console.log('✅ Speech recognition ENDED');
                 sessionState.isListening = false;
+                if (sessionState.isPrimingRecognition) {
+                    console.log('✅ Speech recognition priming session ended');
+                    sessionState.isPrimingRecognition = false;
+                    sessionState.skipRecognitionResults = false;
+                    sessionState.waitingForAnswer = false;
+                    sessionState.androidPrimed = true;
+                    if (androidPrimeResolver) {
+                        const resolver = androidPrimeResolver;
+                        androidPrimeResolver = null;
+                        resolver();
+                    }
+                    return;
+                }
                 if (sessionState.isActive && sessionState.waitingForAnswer && !sessionState.processingAnswer) {
                     startListeningForAnswer(500);
                 }
             };
 
             // Load available voices
-            loadVoices();
-            speechSynthesis.onvoiceschanged = loadVoices;
+            if (speechSynthesis) {
+                loadVoices();
+                speechSynthesis.onvoiceschanged = loadVoices;
+            } else {
+                addCompatibilityNote('הדפדפן לא תומך בהקראת קול. התרגילים יוצגו כטקסט בלבד.');
+            }
 
             return true;
         }
 
         // Load available voices
         function loadVoices() {
+            if (!speechSynthesis) {
+                const voiceSelect = document.getElementById('voiceSelect');
+                if (voiceSelect) {
+                    voiceSelect.innerHTML = '<option value="auto">אין קולות זמינים</option>';
+                    voiceSelect.disabled = true;
+                }
+                return;
+            }
+
             const voices = speechSynthesis.getVoices();
             const voiceSelect = document.getElementById('voiceSelect');
             
@@ -1397,6 +1701,7 @@
                 return;
             }
             sessionState.processingAnswer = true;
+            setManualAnswerEnabled(false);
             // Pause recognition while processing
             try { 
                 if (sessionState.isListening && speechRecognition) {
@@ -1447,6 +1752,7 @@
                 showError(`לא ניתן היה לזהות את המספר (זוהה: "${displaySpeech}"). לחצו על "דלג" או אמרו את התשובה בבירור.`);
                 sessionState.processingAnswer = false;
                 sessionState.waitingForAnswer = true;
+                setManualAnswerEnabled(true);
                 updateStatus('מוכן לתשובה', 'waiting');
                 startListeningForAnswer(800);
                 return;
@@ -1469,6 +1775,7 @@
             
             setTimeout(() => {
                 sessionState.processingAnswer = false;
+                setManualAnswerEnabled(sessionState.isActive);
                 if (sessionState.isActive) {
                     if (sessionState.currentQuestionIndex < questions[`label${sessionState.currentLabel}`].length) {
                         askCurrentQuestion();
@@ -1492,10 +1799,23 @@
             sessionState.currentQuestion = currentQuestions[sessionState.currentQuestionIndex];
             sessionState.processingAnswer = false;
             sessionState.waitingForAnswer = false;
+            setManualAnswerEnabled(false);
             
             document.getElementById('questionDisplay').textContent = sessionState.currentQuestion.question;
+            if (manualAnswerInput) {
+                manualAnswerInput.value = '';
+            }
             
             await speak(sessionState.currentQuestion.text);
+
+            if (!sessionState.voiceInputSupported) {
+                updateStatus('הקלידו את התשובה ולחצו "שליחת תשובה"', 'waiting');
+                if (manualHint) {
+                    manualHint.textContent = 'הקלידו את התשובה ולחצו "שליחת תשובה" כדי להמשיך.';
+                }
+                setManualAnswerEnabled(true);
+                return;
+            }
             
             // Start listening for answer (only if not already listening)
             setTimeout(() => {
@@ -1510,6 +1830,11 @@
                 console.log('Starting speech recognition...');
                 startListeningForAnswer();
             }, 1000);
+
+            if (manualHint) {
+                manualHint.textContent = 'אפשר לענות בקול או להקליד את התשובה וללחוץ "שליחת תשובה".';
+            }
+            setManualAnswerEnabled(true);
         }
 
         // Complete current label
@@ -1572,10 +1897,20 @@
                 return;
             }
 
-            const hasMic = await ensureMicrophoneAccess(true);
-            if (!hasMic) {
-                updateStatus('נדרש מיקרופון פעיל להתחלת השיעור', 'waiting');
-                return;
+            if (sessionState.voiceInputSupported) {
+                const hasMic = await ensureMicrophoneAccess(true);
+                if (!hasMic) {
+                    updateStatus('נדרש מיקרופון פעיל להתחלת השיעור', 'waiting');
+                    return;
+                }
+                sessionState.microphoneReady = true;
+
+                if (isAndroid) {
+                    await primeAndroidRecognition();
+                }
+            } else {
+                sessionState.microphoneReady = false;
+                addCompatibilityNote('המאזין הקולי לא זמין. השתמשו בהקלדת תשובה.');
             }
 
             // Load saved session if exists
@@ -1588,13 +1923,21 @@
             sessionState.sessionHistory = [];
             sessionState.processingAnswer = false;
             sessionState.waitingForAnswer = false;
-            sessionState.microphoneReady = true;
+            sessionState.isPrimingRecognition = false;
+            sessionState.skipRecognitionResults = false;
+            sessionState.androidPrimed = isAndroid ? sessionState.androidPrimed : false;
             
             document.getElementById('startBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             document.getElementById('repeatBtn').disabled = false;
             document.getElementById('skipBtn').disabled = false;
             document.getElementById('historyList').innerHTML = '';
+            setManualAnswerEnabled(true);
+            if (manualHint) {
+                manualHint.textContent = sessionState.voiceInputSupported
+                    ? 'אפשר גם להקליד את התשובה וללחוץ "שליחת תשובה" בכל רגע.'
+                    : 'הקלידו את התשובה ולחצו "שליחת תשובה" כדי להמשיך.';
+            }
             
             updateStatus('מתחילים את השיעור...', 'waiting');
             updateProgress();
@@ -1684,6 +2027,7 @@
             document.getElementById('stopBtn').disabled = true;
             document.getElementById('repeatBtn').disabled = true;
             document.getElementById('skipBtn').disabled = true;
+            setManualAnswerEnabled(false);
             
             updateStatus('השיעור נעצר', 'waiting');
             saveSession();
@@ -1703,12 +2047,18 @@
                 sessionHistory: [],
                 processingAnswer: false,
                 waitingForAnswer: false,
-                microphoneReady: false
+                microphoneReady: false,
+                isPrimingRecognition: false,
+                skipRecognitionResults: false,
+                androidPrimed: false,
+                voiceInputSupported: !!SpeechRecognitionConstructor,
+                voiceOutputSupported: speechSynthesisSupported
             };
             
             document.getElementById('questionDisplay').textContent = 'לחצו על "התחל" כדי להתחיל בשיעור';
             document.getElementById('progressBar').style.width = '0%';
             document.getElementById('historyList').innerHTML = '';
+            setManualAnswerEnabled(false);
             
             updateStatus('מוכן להתחלת השיעור', 'waiting');
             
@@ -1746,6 +2096,11 @@
                         sessionState.processingAnswer = false;
                         sessionState.waitingForAnswer = false;
                         sessionState.microphoneReady = false;
+                        sessionState.isPrimingRecognition = false;
+                        sessionState.skipRecognitionResults = false;
+                        sessionState.androidPrimed = false;
+                        sessionState.voiceInputSupported = !!SpeechRecognitionConstructor;
+                        sessionState.voiceOutputSupported = speechSynthesisSupported;
                         
                         // Restore history display
                         const historyList = document.getElementById('historyList');
@@ -1786,6 +2141,38 @@
             if (!window.isSecureContext) {
                 console.warn('Microphone permissions require a secure context (https or localhost).');
                 showError('כדי לאפשר גישה למיקרופון, פתחו את הדף דרך https:// או באמצעות שרת מקומי (לדוגמה localhost).');
+                addCompatibilityNote('פתיחת הדף באמצעות https:// או localhost מאפשרת שימוש מלא במיקרופון.');
+            }
+
+            if (!sessionState.voiceInputSupported) {
+                addCompatibilityNote('הדפדפן לא תומך בזיהוי דיבור. ניתן להקליד תשובה בכל שלב.');
+            }
+
+            if (!sessionState.voiceOutputSupported) {
+                addCompatibilityNote('הדפדפן לא תומך בהקראת קול. התרגילים יוצגו כטקסט בלבד.');
+            }
+
+            if (isSafari) {
+                addCompatibilityNote('בדפדפן Safari אין תמיכה בזיהוי דיבור. מומלץ להשתמש ב-Chrome או Edge, או לענות באמצעות ההקלדה.');
+            }
+
+            if (isOpera) {
+                addCompatibilityNote('בכמה גרסאות של Opera יש מגבלות בזיהוי דיבור. אם אין שמע מהמשתמש, השתמשו בהקלדת תשובה או עברו ל-Chrome.');
+            }
+
+            if (isIOS) {
+                addCompatibilityNote('ב-iPhone/iPad התמיכה בזיהוי דיבור בדפדפן מוגבלת. אם אין זיהוי קול, השתמשו בהקלדת תשובה.');
+            }
+
+            setManualAnswerEnabled(false);
+
+            if (manualAnswerInput) {
+                manualAnswerInput.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        submitManualAnswer();
+                    }
+                });
             }
         });
     </script>
